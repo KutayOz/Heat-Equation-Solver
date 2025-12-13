@@ -22,6 +22,13 @@ from src.time_marching import (
     generate_computation_report
 )
 from src.report_generator import generate_full_report
+from src.output_manager import (
+    get_timestamp,
+    create_full_run_structure,
+    create_stability_folder,
+    create_computation_folder,
+    print_output_summary
+)
 
 
 def clear_screen():
@@ -119,27 +126,32 @@ def get_yes_no(prompt: str, default: bool = False) -> bool:
     return user_input in ['y', 'yes']
 
 
-def run_full(output_dir: str = "outputs", report_dir: str = "report",
+def run_full(base_dir: str = "outputs",
              mu_analysis: list = None, mu_compute: list = None,
              J: int = 32, tol: float = 1e-5, max_steps: int = 200000):
-    """Run both stability analysis and computations."""
+    """Run both stability analysis and computations with organized folders."""
     if mu_analysis is None:
         mu_analysis = [0.25, 0.5, 1.0, 2.5]
     if mu_compute is None:
         mu_compute = [0.25, 0.5, 1.0, 2.5, 10, 100, 1000]
     
-    os.makedirs(output_dir, exist_ok=True)
-    os.makedirs(report_dir, exist_ok=True)
+    # Create organized folder structure with timestamp
+    timestamp = get_timestamp()
+    run_folder, stability_dir, computation_dir, report_dir = create_full_run_structure(
+        base_dir, timestamp
+    )
     
-    # Part A
+    print(f"\nCreated run folder: {run_folder}")
+    
+    # Part A - Stability Analysis
     print("\n" + "=" * 60)
     stability_plots, stability_report = run_stability_analysis(
         mu_values=mu_analysis,
-        output_dir=output_dir,
+        output_dir=stability_dir,
         show_plots=False
     )
     
-    # Part B
+    # Part B - Time Marching
     results = run_all_simulations(
         mu_values=mu_compute,
         J=J,
@@ -147,8 +159,8 @@ def run_full(output_dir: str = "outputs", report_dir: str = "report",
         max_steps=max_steps
     )
     
-    results_table = generate_results_table(results, output_dir)
-    computation_plots = plot_solutions(results, output_dir, show_plots=False)
+    results_table = generate_results_table(results, computation_dir)
+    computation_plots = plot_solutions(results, computation_dir, show_plots=False)
     computation_report = generate_computation_report(results)
     
     # Generate report
@@ -164,17 +176,19 @@ def run_full(output_dir: str = "outputs", report_dir: str = "report",
     print("\n" + "=" * 60)
     print("COMPLETE!")
     print("=" * 60)
-    print(f"Output files saved to: {output_dir}/")
-    print(f"Report saved to: {report_path}")
+    print_output_summary(run_folder)
 
 
-def run_analysis_only(output_dir: str = "outputs", 
+def run_analysis_only(base_dir: str = "outputs", 
                       mu_analysis: list = None):
-    """Run stability analysis only."""
+    """Run stability analysis only with organized folder."""
     if mu_analysis is None:
         mu_analysis = [0.25, 0.5, 1.0, 2.5]
     
-    os.makedirs(output_dir, exist_ok=True)
+    # Create timestamped folder for this run
+    output_dir = create_stability_folder(base_dir)
+    
+    print(f"\nCreated output folder: {output_dir}")
     
     stability_plots, stability_report = run_stability_analysis(
         mu_values=mu_analysis,
@@ -185,18 +199,20 @@ def run_analysis_only(output_dir: str = "outputs",
     print("\n" + "=" * 60)
     print("STABILITY ANALYSIS COMPLETE!")
     print("=" * 60)
-    print(f"Plots saved to: {output_dir}/")
+    print_output_summary(output_dir)
 
 
-def run_compute_only(output_dir: str = "outputs", report_dir: str = "report",
+def run_compute_only(base_dir: str = "outputs",
                      mu_compute: list = None, J: int = 32, 
                      tol: float = 1e-5, max_steps: int = 200000):
-    """Run time-marching computations only."""
+    """Run time-marching computations only with organized folder."""
     if mu_compute is None:
         mu_compute = [0.25, 0.5, 1.0, 2.5, 10, 100, 1000]
     
-    os.makedirs(output_dir, exist_ok=True)
-    os.makedirs(report_dir, exist_ok=True)
+    # Create timestamped folder for this run
+    output_dir = create_computation_folder(base_dir)
+    
+    print(f"\nCreated output folder: {output_dir}")
     
     results = run_all_simulations(
         mu_values=mu_compute,
@@ -211,7 +227,7 @@ def run_compute_only(output_dir: str = "outputs", report_dir: str = "report",
     print("\n" + "=" * 60)
     print("COMPUTATIONS COMPLETE!")
     print("=" * 60)
-    print(f"Results saved to: {output_dir}/")
+    print_output_summary(output_dir)
 
 
 def custom_run_menu():
@@ -251,15 +267,11 @@ def custom_run_menu():
         tol = get_float("Convergence tolerance:", 1e-5)
         max_steps = get_int("Maximum time steps:", 200000)
     
-    # Output directories
-    print("\n--- Output Directories ---")
-    output_dir = input("Output directory (Enter for 'outputs'): ").strip()
-    if not output_dir:
-        output_dir = "outputs"
-    
-    report_dir = input("Report directory (Enter for 'report'): ").strip()
-    if not report_dir:
-        report_dir = "report"
+    # Output directory
+    print("\n--- Output Directory ---")
+    base_dir = input("Base output directory (Enter for 'outputs'): ").strip()
+    if not base_dir:
+        base_dir = "outputs"
     
     # Confirm and run
     print("\n" + "-" * 40)
@@ -271,17 +283,17 @@ def custom_run_menu():
         print(f"  Grid intervals: {J}")
         print(f"  Tolerance: {tol}")
         print(f"  Max steps: {max_steps}")
-    print(f"  Output dir: {output_dir}")
-    print(f"  Report dir: {report_dir}")
+    print(f"  Base output dir: {base_dir}")
+    print(f"  (Timestamped subfolder will be created automatically)")
     print("-" * 40)
     
     if get_yes_no("Proceed with this configuration?", default=True):
         if run_choice == '1':
-            run_full(output_dir, report_dir, mu_analysis, mu_compute, J, tol, max_steps)
+            run_full(base_dir, mu_analysis, mu_compute, J, tol, max_steps)
         elif run_choice == '2':
-            run_analysis_only(output_dir, mu_analysis)
+            run_analysis_only(base_dir, mu_analysis)
         else:
-            run_compute_only(output_dir, report_dir, mu_compute, J, tol, max_steps)
+            run_compute_only(base_dir, mu_compute, J, tol, max_steps)
     else:
         print("Cancelled.")
 

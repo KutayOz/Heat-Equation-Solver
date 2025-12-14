@@ -690,7 +690,7 @@ def plot_solutions(results: List[SimulationResult],
     # Plot 2: Final solutions comparison for each mu
     mu_values = sorted(set(r.mu for r in results))
     
-    for mu in mu_values[:4]:  # Limit to first 4 mu values to avoid too many plots
+    for mu in mu_values:  # Generate plots for all mu values
         fig, ax = plt.subplots(figsize=(8, 5))
         
         colors = {0.0: 'red', 0.5: 'blue', 1.0: 'green'}
